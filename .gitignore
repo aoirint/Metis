@@ -1,7 +1,11 @@
 __pycache__/
+
 db.sqlite3
-/media
 /db
+
 /.env.django
 /.env.mysql
-/dump.json
+/.htpasswd
+
+/django/media
+/django/dump.json

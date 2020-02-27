@@ -4,19 +4,21 @@ services:
     image: nginx
     volumes:
       - ./metis.nginx:/etc/nginx/conf.d/default.conf
-      - ./static:/static
-      - ./media:/media
+      - ./django/static:/static
+      - ./django/media:/media
     env_file:
       - .env.nginx
     ports:
       - "127.0.0.1:8805:80"
+    depends_on:
+      - django
   django:
-    build: .
+    build: ./django
     restart: always
     # command: python manage.py runserver 0.0.0.0:8000
     command: gunicorn -w 2 -b 0.0.0.0:8000 Metis.wsgi
     volumes:
-      - .:/code
+      - ./django:/code
     env_file:
       - .env.django
     depends_on:
