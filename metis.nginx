@@ -27,12 +27,12 @@ server {
 	#auth_basic_user_file /code/.htpasswd;
 
 	location /static/ {
-		alias /static/;
+		alias /nginx/static/;
 		autoindex on;
 	}
 
 	location /media/ {
-		alias /media/;
+		alias /nginx/media/;
 		autoindex on;
 	}
 

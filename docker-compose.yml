@@ -5,8 +5,8 @@ services:
     restart: always
     volumes:
       - ./metis.nginx:/etc/nginx/conf.d/default.conf
-      - ./django/static:/static
-      - ./django/media:/media
+      - ./django/static:/nginx/static
+      - ./django/media:/nginx/media
     env_file:
       - .env.nginx
     ports:
