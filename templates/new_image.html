@@ -1,0 +1,38 @@
+{% load static %}
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<script src="{% static 'js/jquery-3.4.1.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/tagify.css' %}">
+<script src="{% static 'js/jQuery.tagify-2.30.0.min.js' %}"></script>
+
+<ul>
+  <li>
+    <a href="{% url 'wui:index' %}">Index</a>
+  <li>
+    <a href="{% url 'wui:new_image' %}">Upload New Image/s</a>
+  <li>
+    <a href="{% url 'wui:list_image' %}">Browse Images</a>
+</ul>
+
+<form id="new_image_form" method="POST" enctype="multipart/form-data">
+  {% csrf_token %}
+</form>
+
+<p>
+  Image File: {{ new_image_form.image }}
+
+<p>
+  {{ new_image_form.source_page_url }}
+  {{ new_image_form.source_raw_url }}
+
+<p>
+  {{ new_image_form.tags }}
+
+<p>
+  <button type="submit" form="new_image_form">Submit</button>
+
+<script>
+  $('#tags_input').tagify();
+
+</script>

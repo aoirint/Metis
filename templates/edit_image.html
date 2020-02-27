@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<script src="{% static 'js/jquery-3.4.1.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/tagify.css' %}">
+<script src="{% static 'js/jQuery.tagify-2.30.0.min.js' %}"></script>
+
+<ul>
+  <li>
+    <a href="{% url 'wui:index' %}">Index</a>
+  <li>
+    <a href="{% url 'wui:new_image' %}">Upload New Image/s</a>
+  <li>
+    <a href="{% url 'wui:list_image' %}">Browse Images</a>
+</ul>
+
+<form id="delete_image_form" method="POST">
+  {% csrf_token %}
+  {{ delete_image_form.post_type }}
+</form>
+
+<form id="edit_image_form" method="POST">
+  {% csrf_token %}
+  {{ edit_image_form.post_type }}
+</form>
+
+<p>
+  <button id="delete_image_button" type="submit" form="delete_image_form">Delete this Image</button>
+
+<h2>Image</h2>
+<div class="image-preview-box">
+  <img class="image-preview" src="{{ image.image_display_file.url }}">
+</div>
+
+<p>
+  {{ edit_image_form.source_page_url }}
+  {{ edit_image_form.source_raw_url }}
+
+<p>
+  {{ edit_image_form.tags }}
+
+<p>
+  <button type="submit" form="edit_image_form" data-type="edit_image">Save</button>
+
+<h3>Bounding Box</h3>
+  <p>
+    <a href="{% url 'wui:new_bbox_image' image.id %}">New Bounding Box for this Image</a>
+
+<table border="1" cellpadding="3">
+  <tr>
+    <th>Tag
+    <th>Area %
+    <th>Menu
+{% for bbox in image.bboxes.all %}
+  <tr>
+    <td>
+      {{ bbox.tag.name }}
+({% for tag in bbox.tag.tree %} {{ tag.name }} -> {% endfor %})
+    <td>{{ bbox.area_percentage |floatformat }}
+    <td>
+      <a href="{% url 'wui:edit_bbox_image' image.id bbox.id %}">Edit</a>
+{% endfor %}
+</table>
+
+<script>
+  $('#delete_image_button').on('click', function(e) {
+    if (! confirm('Confirm to delete')) {
+      e.preventDefault();
+    }
+  });
+
+  $('#tags_input').tagify();
+
+</script>

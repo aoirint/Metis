@@ -1,0 +1,318 @@
+{% load static %}
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<script src="{% static 'js/jquery-3.4.1.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/tagify.css' %}">
+<script src="{% static 'js/jQuery.tagify-2.30.0.min.js' %}"></script>
+
+<div class="container">
+  <ul>
+    <li>
+      <a href="{% url 'wui:index' %}">Index</a>
+    <li>
+      <a href="{% url 'wui:new_image' %}">Upload New Image/s</a>
+    <li>
+      <a href="{% url 'wui:list_image' %}">Browse Images</a>
+  </ul>
+
+  <form id="edit_bbox_form" method="POST">
+    {% csrf_token %}
+    {{ edit_bbox_form.post_type }}
+  </form>
+
+  <form id="delete_bbox_form" method="POST">
+    {% csrf_token %}
+    {{ delete_bbox_form.post_type }}
+  </form>
+
+  <p>
+    {{ edit_bbox_form.tags }}
+
+  <div style="display: flex;">
+    <table style="padding: .5em 1em;">
+      <tr>
+        <td>
+          Left
+          <td>
+          {{ edit_bbox_form.left }}
+        <td>
+          Right
+        <td>
+          <input id="right_input" type="number">
+      <tr>
+        <td>
+          Top
+        <td>
+        {{ edit_bbox_form.top }}
+        <td>
+          Bottom
+        <td>
+          <input id="bottom_input" type="number">
+    </table>
+
+    <table style="padding: .5em 1em;">
+      <tr>
+        <td>
+          Center X
+        <td>
+          <input id="center_x_input" type="number">
+        <td>
+          Center Y
+        <td>
+          <input id="center_y_input" type="number">
+      <tr>
+        <td>
+          Width
+        <td>
+          {{ edit_bbox_form.width }}
+        <td>
+          Height
+        <td>
+          {{ edit_bbox_form.height }}
+    </table>
+  </div>
+
+  <p>
+    <button type="submit" form="edit_bbox_form">Save</button>
+    <button type="reset" form="edit_bbox_form">Reset</button>
+{% if bbox %}
+    <button id="delete_bbox_button" type="submit" form="delete_bbox_form">Delete this Bounding box</button>
+{% endif %}
+
+    <a href="{% url 'wui:edit_image' image.id %}">Back to Image</a>
+
+  <p>
+    <table>
+      <tr>
+        <td>
+          Line Width
+        <td>
+          <input id="line_width_input" type="number" value="1" min="1", max="8">
+    </table>
+
+  <div class="bbox-image-preview-box-wrapper">
+    <div class="bbox-image-preview-box">
+      <img class="bbox-image-preview" src="{{ image.image_file.url }}" data-width="{{ image.image_file.width }}" data-height="{{ image.image_file.height }}">
+      <canvas id="bbox_canvas" class="canvas-full" width="{{ image.image_file.width }}" height="{{ image.image_file.height }}"></canvas>
+    </div>
+  </div>
+
+  <script>
+    $('#tags_input').tagify({
+      'maxTags': 1,
+    });
+
+    var bboxCanvas = $('#bbox_canvas');
+    var isDrawingBBox = false;
+    var startX = 0;
+    var startY = 0;
+    var endX = 0;
+    var endY = 0;
+    var mouseX = 0;
+    var mouseY = 0;
+
+    var leftInput = $('#left_input');
+    var topInput = $('#top_input');
+    var rightInput = $('#right_input');
+    var bottomInput = $('#bottom_input');
+
+    var centerXInput = $('#center_x_input');
+    var centerYInput = $('#center_y_input');
+    var widthInput = $('#width_input');
+    var heightInput = $('#height_input');
+
+    var lineWidthInput = $('#line_width_input');
+
+    var lineWidth = lineWidthInput.val();
+    lineWidthInput.on('change', function() {
+      var val = parseInt(lineWidthInput.val());
+      if (val) {
+        lineWidth = val;
+        updateCanvas();
+      }
+    });
+
+    leftInput.on('change', onBBoxSideFieldUpdated);
+    topInput.on('change', onBBoxSideFieldUpdated);
+    rightInput.on('change', onBBoxSideFieldUpdated);
+    bottomInput.on('change', onBBoxSideFieldUpdated);
+
+    centerXInput.on('change', onBBoxCenterSizeFieldUpdated);
+    centerYInput.on('change', onBBoxCenterSizeFieldUpdated);
+    widthInput.on('change', onBBoxCenterSizeFieldUpdated);
+    heightInput.on('change', onBBoxCenterSizeFieldUpdated);
+
+
+    function onBBoxFieldUpdated() {
+      setVirtualBBoxFieldsWithBBox();
+      updateCanvas();
+    }
+    function onBBoxSideFieldUpdated() {
+      var left = asInt(leftInput.val());
+      var top = asInt(topInput.val());
+      var right = asInt(rightInput.val());
+      var bottom = asInt(bottomInput.val());
+
+      var width = right - left;
+      var height = bottom - top;
+      var centerX = Math.round((left + right) / 2);
+      var centerY = Math.round((top + bottom) / 2);
+
+      centerXInput.val(centerX);
+      centerYInput.val(centerY);
+      widthInput.val(width);
+      heightInput.val(height);
+
+      updateCanvas();
+    }
+    function onBBoxCenterSizeFieldUpdated() {
+      var centerX = asInt(centerXInput.val());
+      var centerY = asInt(centerYInput.val());
+      var width = asInt(widthInput.val());
+      var height = asInt(heightInput.val());
+
+      var left = Math.round(centerX - width/2);
+      var top = Math.round(centerY - height/2);
+      var right = Math.round(centerX + width/2);
+      var bottom = Math.round(centerY + height/2);
+
+      leftInput.val(left);
+      topInput.val(top);
+      rightInput.val(right);
+      bottomInput.val(bottom);
+
+      updateCanvas();
+    }
+
+    function asInt(val) {
+      return parseInt(val);
+    }
+    function updateBBoxWithMouse() {
+      var minX = Math.min(startX, endX);
+      var maxX = Math.max(startX, endX);
+      var minY = Math.min(startY, endY);
+      var maxY = Math.max(startY, endY);
+
+      var domWidth = bboxCanvas.width();
+      var domHeight = bboxCanvas.height();
+
+      var cvs = bboxCanvas[0];
+      var cvsWidth = cvs.width;
+      var cvsHeight = cvs.height;
+
+      var scaleX = cvsWidth/domWidth;
+      var scaleY = cvsHeight/domHeight;
+      var scaleL = Math.sqrt(scaleX*scaleX + scaleY*scaleY);
+
+      var minXInImage = minX * scaleX;
+      var minYInImage = minY * scaleY;
+      var maxXInImage = maxX * scaleX;
+      var maxYInImage = maxY * scaleY;
+
+      var widthInImage = maxXInImage - minXInImage;
+      var heightInImage = maxYInImage - minYInImage;
+
+      leftInput.val(Math.round(minXInImage));
+      topInput.val(Math.round(minYInImage));
+      rightInput.val(Math.round(maxXInImage));
+      bottomInput.val(Math.round(maxYInImage));
+
+      onBBoxSideFieldUpdated();
+    }
+    function updateCanvas() {
+      var domWidth = bboxCanvas.width();
+      var domHeight = bboxCanvas.height();
+
+      var cvs = bboxCanvas[0];
+      var cvsWidth = cvs.width;
+      var cvsHeight = cvs.height;
+
+      var scaleX = cvsWidth/domWidth;
+      var scaleY = cvsHeight/domHeight;
+      var scaleL = Math.sqrt(scaleX*scaleX + scaleY*scaleY);
+
+      var left = leftInput.val();
+      var top = topInput.val();
+      var width = widthInput.val();
+      var height = heightInput.val();
+
+      var ctx = cvs.getContext('2d');
+
+      ctx.clearRect(0, 0, cvsWidth, cvsHeight);
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgb(255,0,255)';
+      ctx.lineWidth = lineWidth * scaleL;
+      ctx.rect(left, top, width, height);
+      ctx.stroke();
+
+    }
+
+    bboxCanvas.on('mousedown', function(e) {
+      mouseX = e.offsetX;
+      mouseY = e.offsetY;
+
+      startX = endX = mouseX;
+      startY = endY = mouseY;
+      isDrawingBBox = true;
+
+      updateBBoxWithMouse();
+    }).on('mousemove', function(e) {
+      mouseX = e.offsetX;
+      mouseY = e.offsetY;
+
+      if (isDrawingBBox) {
+        endX = mouseX;
+        endY = mouseY;
+
+        updateBBoxWithMouse();
+      }
+
+    }).on('mouseup', function(e) {
+      mouseX = e.offsetX;
+      mouseY = e.offsetY;
+
+      if (isDrawingBBox) {
+        endX = mouseX;
+        endY = mouseY;
+
+        isDrawingBBox = false;
+        updateBBoxWithMouse();
+      }
+
+    });
+
+
+    function initEditBBoxForm() {
+      var left = asInt(leftInput.val());
+      var top = asInt(topInput.val());
+      var width = asInt(widthInput.val());
+      var height = asInt(heightInput.val());
+
+      var right = left + width;
+      var bottom = top + height;
+      var centerX = Math.round(left + width/2);
+      var centerY = Math.round(left + width/2);
+
+      centerXInput.val(centerX);
+      centerYInput.val(centerY);
+      rightInput.val(right);
+      bottomInput.val(bottom);
+
+      setTimeout(updateCanvas, 100);
+    };
+
+    initEditBBoxForm();
+
+    $('#edit_bbox_form').on('reset', function() {
+      setTimeout(initEditBBoxForm, 1);
+    });
+
+    $('#delete_bbox_button').on('click', function(e) {
+      if (! confirm('Confirm to delete')) {
+        e.preventDefault();
+      }
+    });
+
+  </script>
+</div>
